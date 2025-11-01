@@ -1,0 +1,171 @@
+export const translations = {
+  en: {
+    // LoginScreen translations
+    loginTitle: 'Log In Your Account',
+    username: 'Username',
+    enterUsername: 'Enter username',
+    password: 'Password',
+    enterPassword: 'Enter password',
+    forgetPassword: 'Forget Password?',
+    login: 'Log In',
+    dontHaveAccount: "Don't have an account?",
+    newUser: 'New User',
+    loginError: 'Please enter both username and password.',
+    loginSuccess: 'Login successful!',
+    loginFailed: 'Login failed!',
+    somethingWrong: 'Something went wrong!',
+
+    // SignupScreen translations
+    signupTitle: 'Create Your Account',
+    fullName: 'Full Name',
+    enterName: 'Enter your name',
+    mobile: 'Mobile Number',
+    enterMobile: 'Enter your mobile number',
+    email: 'Email ID',
+    enterEmail: 'Enter your email',
+    Address: 'Address',
+    enterAddress: 'Enter your Address',
+    submit: 'Submit',
+    fillAllFields: 'Please fill in all fields.',
+    invalidMobile: 'Enter a valid 10-digit mobile number.',
+    passwordLength: 'Password must be at least 6 characters.',
+    success: 'Success',
+    accountCreated: 'Account created successfully!',
+    signupFailed: 'Signup Failed',
+    somethingWrong: 'Something went wrong!',
+    // SuccessLoginScreen
+    congratsText: 'Congratulations..!',
+    subCongratsText: 'You are now a Dealer',
+    welcomeText: 'Welcome to',
+    familyText: '"Yalgud Family"',
+    shopName: 'Jay Bhavani Store',
+    shopAddress: 'Kotoli Phata, Kerle Tal-Karveer, Dist-Kolhapur',
+    continue: 'Continue',
+
+    // ...existing translations
+    createPin: 'Create Your PIN',
+    enterPin: 'Enter PIN',
+    confirmPin: 'Confirm PIN',
+    forgotPin: 'Forgot PIN?',
+    enterAllDigits: 'Please enter all 4 digits!',
+    pinMismatch: 'PINs do not match!',
+    pinCreated: 'PIN created successfully!',
+    ok: 'OK',
+
+    // UserDetailsScreen translations
+    id: 'ID',
+    name: 'Name',
+    contactNo: 'Contact No',
+    emailId: 'Email Id',
+    shopDetails: 'Shop Details',
+    deliveryAddress: 'Delivery Address',
+    shopAddressFull:
+      'Jay Bhavani Store, Kotoli Phata, Kerle Tal-Karveer, Dist-Kolhapur',
+    shopOption: 'Jay Bhavani Store, Kotoli Phata, Karveer, Kolhapur',
+    deliveryOption: 'Main road, Karveer Tal - Kolhapur, 416229',
+    billingOption: 'Billing Address: Shivaji Peth, Kolhapur, 416001',
+    continue: 'Continue',
+
+    offersTitle: '“Yalgud Dairy”',
+    skip: 'Skip',
+
+    // HomeScreen translations
+    homeTitle: 'Home',
+    historyTitle: 'History',
+    profileTitle: 'Profile',
+    cartTitle: 'Cart',
+
+    storeName: 'Jay Bhavani Stores',
+    location: 'Kolhapur',
+
+    noCategories: 'No categories found.',
+    historyScreen: 'History Screen',
+    profileScreen: 'Profile Screen',
+    cartScreen: 'Cart Screen',
+  },
+  mr: {
+    // LoginScreen translations
+    loginTitle: 'आपले खाते लॉग इन करा',
+    username: 'वापरकर्तानाव',
+    enterUsername: 'वापरकर्तानाव प्रविष्ट करा',
+    password: 'संकेतशब्द',
+    enterPassword: 'संकेतशब्द प्रविष्ट करा',
+    forgetPassword: 'संकेतशब्द विसरलात?',
+    login: 'लॉग इन करा',
+    dontHaveAccount: 'खाते नाही?',
+    newUser: 'नवीन वापरकर्ता',
+    loginError: 'कृपया वापरकर्तानाव आणि संकेतशब्द प्रविष्ट करा.',
+    loginSuccess: 'यशस्वी लॉगिन!',
+    loginFailed: 'लॉगिन अयशस्वी!',
+    somethingWrong: 'काहीतरी चूक झाली!',
+
+    // SignupScreen translations
+    signupTitle: 'आपले खाते तयार करा',
+    fullName: 'पूर्ण नाव',
+    enterName: 'आपले नाव प्रविष्ट करा',
+    mobile: 'मोबाइल नंबर',
+    enterMobile: 'आपला मोबाइल नंबर प्रविष्ट करा',
+    email: 'ईमेल आयडी',
+    enterEmail: 'आपला ईमेल प्रविष्ट करा',
+    Address: 'पत्ता',
+    enterAddress: 'आपला पत्ता प्रविष्ट करा',
+    submit: 'सादर करा',
+    fillAllFields: 'कृपया सर्व माहिती भरा.',
+    invalidMobile: 'कृपया 10 अंकी वैध मोबाइल नंबर प्रविष्ट करा.',
+    passwordLength: 'संकेतशब्द किमान 6 अंकी असावा.',
+    success: 'यश',
+    accountCreated: 'खाते यशस्वीरीत्या तयार झाले!',
+    signupFailed: 'साइनअप अयशस्वी! पुन्हा प्रयत्न करा.',
+    somethingWrong: 'काहीतरी चूक झाली!',
+    // SuccessLoginScreen
+    congratsText: 'अभिनंदन..!',
+    subCongratsText: 'आपण आता विक्रेता आहात',
+    welcomeText: 'सुस्वागतम्',
+    familyText: '"यळगूड कुटुंब"',
+    shopName: 'जय भवानी स्टोअर',
+    shopAddress: 'कोटोळी फाटा, केर्ले तालुका-करवीर, जिल्हा-कोल्हापूर',
+    continue: 'सुरू करा',
+
+    // ...existing translations
+    createPin: 'आपला पिन तयार करा',
+    enterPin: 'पिन प्रविष्ट करा',
+    confirmPin: 'पिन पुष्टी करा',
+    forgotPin: 'पिन विसरलात?',
+    enterAllDigits: 'कृपया सर्व 4 अंक प्रविष्ट करा!',
+    pinMismatch: 'पिन जुळत नाहीत!',
+    pinCreated: 'पिन यशस्वीरित्या तयार झाला!',
+    ok: 'ठीक आहे',
+    // UserDetailsScreen translations
+    id: 'आयडी',
+    name: 'नाव',
+    contactNo: 'संपर्क क्रमांक',
+    emailId: 'ईमेल आयडी',
+    shopDetails: 'दुकानाची माहिती',
+    deliveryAddress: 'डिलिव्हरी पत्ता',
+    shopAddressFull:
+      'जय भवानी स्टोअर, कोटोळी फाटा, केर्ले तालुका-करवीर, जिल्हा-कोल्हापूर',
+    shopOption: 'जय भवानी स्टोअर, कोटोळी फाटा, करवीर, कोल्हापूर',
+    deliveryOption: 'मुख्य रस्ता, करवीर तालुका - कोल्हापूर, 416229',
+    billingOption: 'बिलिंग पत्ता: शिवाजी पेठ, कोल्हापूर, 416001',
+    continue: 'सुरू ठेवा',
+
+    //offer screen
+
+    offersTitle: '“यळगूड डेअरी”',
+    skip: 'वगळा',
+
+    // HomeScreen translations
+    homeTitle: 'मुख्यपृष्ठ',
+    historyTitle: 'इतिहास',
+    profileTitle: 'प्रोफाइल',
+    cartTitle: 'कार्ट',
+
+    storeName: 'जय भवानी स्टोअर्स',
+    location: 'कोल्हापूर',
+
+    noCategories: 'कोणत्याही श्रेण्या सापडल्या नाहीत.',
+    historyScreen: 'इतिहास स्क्रीन',
+    profileScreen: 'प्रोफाइल स्क्रीन',
+    cartScreen: 'कार्ट स्क्रीन',
+  },
+};
