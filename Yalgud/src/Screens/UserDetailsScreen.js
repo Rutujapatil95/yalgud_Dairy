@@ -1,19 +1,21 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ImageBackground,
-  Image,
   TouchableOpacity,
   LayoutAnimation,
   Platform,
   UIManager,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Dimensions,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
-import { LanguageContext } from '../../App';
-import { translations } from '../locales/translations';
+import axios from 'axios';
 
 if (
   Platform.OS === 'android' &&
@@ -22,14 +24,47 @@ if (
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-export default function UserDetailsScreen() {
+const { width, height } = Dimensions.get('window');
+const RF = size => Math.round((size * width) / 375);
+
+export default function UserDetailsScreen({ route }) {
   const navigation = useNavigation();
-  const { lang } = useContext(LanguageContext);
-  const t = translations[lang];
 
   const [storeOpen, setStoreOpen] = useState(false);
   const [addressOpen, setAddressOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState('delivery');
+  const [agent, setAgent] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const agentCode = route?.params?.agentCode;
+
+  useEffect(() => {
+    if (!agentCode) {
+      Alert.alert('Error', 'Agent code not provided');
+      setLoading(false);
+      return;
+    }
+
+    const fetchAgent = async () => {
+      try {
+        const response = await axios.get(
+          `http://192.168.1.11:8001/api/agent/${agentCode}`,
+        );
+
+        if (response.data.success) {
+          setAgent(response.data.data);
+        } else {
+          Alert.alert('Error', response.data.message || 'Agent not found');
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Failed to fetch agent details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAgent();
+  }, [agentCode]);
 
   const toggleDropdown = type => {
     LayoutAnimation.easeInEaseOut();
@@ -38,221 +73,243 @@ export default function UserDetailsScreen() {
   };
 
   const handleContinue = () => {
-    navigation.navigate('Offerscreen', { selectedAddress });
+    navigation.navigate('Offerscreen', {
+      selectedAddress,
+      agentCode: agent?.AgentCode,
+    });
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#007bff" />
+      </View>
+    );
+  }
+
+  if (!agent) {
+    return (
+      <View style={styles.loaderContainer}>
+        <Text style={{ color: '#333', fontSize: RF(16) }}>Agent not found</Text>
+      </View>
+    );
+  }
 
   return (
     <ImageBackground
       source={require('../Images/bgimage.jpg')}
       style={styles.bg}
+      resizeMode="cover"
     >
-      <View style={styles.card}>
-        <Image
-          source={require('../Images/profile.png')}
-          style={styles.profileImg}
-        />
-        <Text style={styles.label}>
-          {t.id}: <Text style={styles.value}>YD-FO-2025-014</Text>
-        </Text>
-        <Text style={styles.label}>
-          {t.name}: <Text style={styles.value}>Rahul Patil</Text>
-        </Text>
-        <Text style={styles.label}>
-          {t.contactNo}: <Text style={styles.value}>8476543366</Text>
-        </Text>
-        <Text style={styles.label}>
-          {t.emailId}: <Text style={styles.value}>rahulpatil@gmail.com</Text>
-        </Text>
+      <ScrollView
+        contentContainerStyle={{
+          alignItems: 'center',
+          paddingBottom: 40,
+          width: width,
+        }}
+      >
+        <View style={styles.card}>
+          <Text style={styles.label}>
+            ID: <Text style={styles.value}>{agent.AgentCode}</Text>
+          </Text>
 
-        {/* Shop Details */}
-        <TouchableOpacity
-          style={styles.dropdownHeader}
-          onPress={() => toggleDropdown('store')}
-        >
-          <Text style={styles.dropdownText}>{t.shopDetails}</Text>
-          <Ionicons
-            name={storeOpen ? 'chevron-up' : 'chevron-down'}
-            size={20}
-            color="#555"
-          />
-        </TouchableOpacity>
-        {storeOpen && (
-          <View style={styles.dropdownContent}>
-            <Text style={styles.dropdownItem}>{t.shopAddressFull}</Text>
-          </View>
-        )}
+          <Text style={styles.label}>
+            Name: <Text style={styles.value}>{agent.AgentNameEng}</Text>
+          </Text>
 
-        {/* Delivery Address */}
-        <TouchableOpacity
-          style={styles.dropdownHeader}
-          onPress={() => toggleDropdown('address')}
-        >
-          <Text style={styles.dropdownText}>{t.deliveryAddress}</Text>
-          <Ionicons
-            name={addressOpen ? 'chevron-up' : 'chevron-down'}
-            size={20}
-            color="#555"
-          />
-        </TouchableOpacity>
-        {addressOpen && (
-          <View style={styles.dropdownContent}>
-            {/* Shop Option */}
-            <TouchableOpacity
-              style={styles.optionRow}
-              onPress={() => setSelectedAddress('shop')}
-            >
-              <Ionicons
-                name={
-                  selectedAddress === 'shop'
-                    ? 'radio-button-on'
-                    : 'radio-button-off'
-                }
-                size={20}
-                color="#007bff"
-              />
-              <Text style={styles.optionText}>{t.shopOption}</Text>
-            </TouchableOpacity>
+          <Text style={styles.label}>
+            Contact No:{' '}
+            <Text style={styles.value}>
+              {agent.Mobile && agent.Mobile !== '0' ? agent.Mobile : 'N/A'}
+            </Text>
+          </Text>
 
-            {/* Delivery Option */}
-            <TouchableOpacity
-              style={styles.optionRow}
-              onPress={() => setSelectedAddress('delivery')}
-            >
-              <Ionicons
-                name={
-                  selectedAddress === 'delivery'
-                    ? 'radio-button-on'
-                    : 'radio-button-off'
-                }
-                size={20}
-                color="#007bff"
-              />
-              <Text style={styles.optionText}>{t.deliveryOption}</Text>
-            </TouchableOpacity>
+          <Text style={styles.label}>
+            Email ID:{' '}
+            <Text style={styles.value}>
+              {agent.Email && agent.Email !== '0' ? agent.Email : 'N/A'}
+            </Text>
+          </Text>
 
-            {/* Billing Option */}
-            <TouchableOpacity
-              style={styles.optionRow}
-              onPress={() => setSelectedAddress('billing')}
-            >
-              <Ionicons
-                name={
-                  selectedAddress === 'billing'
-                    ? 'radio-button-on'
-                    : 'radio-button-off'
-                }
-                size={20}
-                color="#007bff"
-              />
-              <Text style={styles.optionText}>{t.billingOption}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          <TouchableOpacity
+            style={styles.dropdownHeader}
+            onPress={() => toggleDropdown('store')}
+          >
+            <Text style={styles.dropdownText}>Shop Details</Text>
+            <Ionicons
+              name={storeOpen ? 'chevron-up' : 'chevron-down'}
+              size={RF(20)}
+              color="#555"
+            />
+          </TouchableOpacity>
 
-        {/* Continue Button */}
-        <TouchableOpacity style={styles.button} onPress={handleContinue}>
-          <Text style={styles.buttonText}>{t.continue}</Text>
-        </TouchableOpacity>
-      </View>
+          {storeOpen && (
+            <View style={styles.dropdownContent}>
+              <Text style={styles.dropdownItem}>
+                {agent.Address1 && agent.Address1 !== '0'
+                  ? agent.Address1
+                  : 'No address available'}
+              </Text>
+              <Text style={styles.dropdownItem}>
+                {agent.Address2 && agent.Address2 !== '0' ? agent.Address2 : ''}
+              </Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={styles.dropdownHeader}
+            onPress={() => toggleDropdown('address')}
+          >
+            <Text style={styles.dropdownText}>Delivery Address</Text>
+            <Ionicons
+              name={addressOpen ? 'chevron-up' : 'chevron-down'}
+              size={RF(20)}
+              color="#555"
+            />
+          </TouchableOpacity>
+
+          {addressOpen && (
+            <View style={styles.dropdownContent}>
+              {agent.Address1 ? (
+                <TouchableOpacity
+                  style={styles.optionRow}
+                  onPress={() => setSelectedAddress('Address1')}
+                >
+                  <Ionicons
+                    name={
+                      selectedAddress === 'Address1'
+                        ? 'radio-button-on'
+                        : 'radio-button-off'
+                    }
+                    size={RF(20)}
+                    color="#007bff"
+                  />
+                  <Text style={styles.optionText}>{agent.Address1}</Text>
+                </TouchableOpacity>
+              ) : null}
+
+              {agent.Address2 ? (
+                <TouchableOpacity
+                  style={styles.optionRow}
+                  onPress={() => setSelectedAddress('Address2')}
+                >
+                  <Ionicons
+                    name={
+                      selectedAddress === 'Address2'
+                        ? 'radio-button-on'
+                        : 'radio-button-off'
+                    }
+                    size={RF(20)}
+                    color="#007bff"
+                  />
+                  <Text style={styles.optionText}>{agent.Address2}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          )}
+
+          <TouchableOpacity style={styles.button} onPress={handleContinue}>
+            <Text style={styles.buttonText}>Continue</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  bg: {
+  loaderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 30,
   },
+
+  bg: {
+    flex: 1,
+    width: width,
+    height: height,
+  },
+
   card: {
-    width: '92%',
+    width: width * 0.9,
     backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 20,
+    padding: width * 0.05,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 6,
+    marginTop: height * 0.28,
     elevation: 6,
   },
-  profileImg: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    marginBottom: 15,
-    borderWidth: 3,
-    borderColor: '#007bff',
-  },
+
   label: {
-    fontSize: 18,
+    fontSize: RF(16),
     fontWeight: '600',
     color: '#222',
     marginVertical: 4,
     textAlign: 'center',
   },
-  value: { fontWeight: 'normal', color: '#444' },
+
+  value: {
+    color: '#444',
+  },
+
   dropdownHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ddd',
+    width: '100%',
     padding: 14,
     borderRadius: 10,
-    marginTop: 14,
-    width: '100%',
-    backgroundColor: '#f9f9f9',
+    marginTop: 16,
+    backgroundColor: '#f8f8f8',
   },
-  dropdownText: { fontSize: 17, fontWeight: '500', color: '#222' },
+
+  dropdownText: {
+    fontSize: RF(15),
+    fontWeight: '600',
+  },
+
   dropdownContent: {
     width: '100%',
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderTopWidth: 0,
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
     padding: 12,
-    marginTop: -8,
-    marginBottom: 6,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 10,
+    marginTop: 4,
+    backgroundColor: '#fff',
   },
+
   dropdownItem: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 5,
-    lineHeight: 20,
+    fontSize: RF(14),
+    marginBottom: 6,
+    color: '#444',
   },
+
   optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
   },
+
   optionText: {
-    fontSize: 14,
-    color: '#444',
+    fontSize: RF(14),
     marginLeft: 10,
     flexShrink: 1,
+    color: '#444',
   },
+
   button: {
     backgroundColor: '#007bff',
-    marginTop: 22,
+    width: '90%',
     paddingVertical: 14,
-    paddingHorizontal: 50,
-    borderRadius: 10,
-    shadowColor: '#007bff',
-    shadowOpacity: 0.4,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 6,
-    elevation: 4,
+    borderRadius: 12,
+    marginTop: 25,
   },
+
   buttonText: {
     color: '#fff',
+    fontSize: RF(17),
     fontWeight: '700',
-    fontSize: 18,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    textAlign: 'center',
   },
 });

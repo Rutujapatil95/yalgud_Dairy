@@ -1,4 +1,4 @@
-import React, { useState, useRef, useContext } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,62 +15,58 @@ import {
   ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LanguageContext } from '../../App';
-import { translations } from '../locales/translations';
+import axios from 'axios';
 
 const { width, height } = Dimensions.get('window');
+const baseWidth = 375;
+const baseHeight = 812;
 
-
-const baseWidth = 375; // reference width (iPhone 11)
-const baseHeight = 812; // reference height (iPhone 11)
-const scale = (size) => (width / baseWidth) * size;
-const verticalScale = (size) => (height / baseHeight) * size;
+const scale = size => (width / baseWidth) * size;
+const verticalScale = size => (height / baseHeight) * size;
+const moderateScale = (size, factor = 0.5) =>
+  size + (scale(size) - size) * factor;
 
 const CreatePinScreen = () => {
-  const { lang } = useContext(LanguageContext);
-  const t = translations[lang];
+  const navigation = useNavigation();
 
   const [pin, setPin] = useState(['', '', '', '']);
   const [confirmPin, setConfirmPin] = useState(['', '', '', '']);
-  const navigation = useNavigation();
 
   const pinRefs = useRef([]);
   const confirmPinRefs = useRef([]);
 
-  const savePinToStorage = async (pinValue) => {
-    try {
-      await AsyncStorage.setItem('@user_pin', JSON.stringify(pinValue));
-      console.log('✅ PIN saved successfully:', pinValue);
-    } catch (error) {
-      console.error('❌ Error saving PIN:', error);
-      Alert.alert('Error', 'Failed to save PIN.');
-    }
-  };
-
   const handleSubmit = async () => {
     if (pin.includes('') || confirmPin.includes('')) {
-      Alert.alert(t.error, t.enterAllDigits);
+      Alert.alert('Error', 'Please enter all 4 digits in both PIN fields.');
       return;
     }
+
     if (pin.join('') !== confirmPin.join('')) {
-      Alert.alert(t.error, t.pinMismatch);
+      Alert.alert('Error', 'PIN and Confirm PIN do not match.');
       return;
     }
 
     const finalPin = pin.join('');
-    await savePinToStorage(finalPin);
 
-    Alert.alert(t.success, t.pinCreated, [
-      {
-        text: t.ok,
-        onPress: () => {
-          setPin(['', '', '', '']);
-          setConfirmPin(['', '', '', '']);
-          navigation.navigate('SuccessLoginScreen');
+    try {
+      await axios.post('http://192.168.1.11:8001/api/user/create-pin', {
+        pin: finalPin,
+      });
+
+      Alert.alert('Success', 'Your PIN has been created successfully!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            setPin(['', '', '', '']);
+            setConfirmPin(['', '', '', '']);
+            navigation.navigate('SuccessLoginScreen');
+          },
         },
-      },
-    ]);
+      ]);
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to save PIN on the server.');
+    }
   };
 
   const renderPinInputs = (values, setValues, refs) => (
@@ -78,36 +74,35 @@ const CreatePinScreen = () => {
       {values.map((digit, index) => (
         <TextInput
           key={index}
-          ref={(ref) => (refs.current[index] = ref)}
+          ref={ref => (refs.current[index] = ref)}
           style={styles.pinInput}
           maxLength={1}
           keyboardType="number-pad"
           value={digit ? '●' : ''}
-          onChangeText={(text) => {
+          onChangeText={text => {
             if (!/^\d?$/.test(text)) return;
-            const newPin = [...values];
-            newPin[index] = text;
-            setValues(newPin);
+
+            const updated = [...values];
+            updated[index] = text;
+            setValues(updated);
+
             if (text && index < values.length - 1) {
               refs.current[index + 1]?.focus();
             }
           }}
           onKeyPress={({ nativeEvent }) => {
             if (nativeEvent.key === 'Backspace') {
-              const newPin = [...values];
+              const updated = [...values];
               if (values[index]) {
-                newPin[index] = '';
-                setValues(newPin);
+                updated[index] = '';
+                setValues(updated);
               } else if (index > 0) {
                 refs.current[index - 1]?.focus();
-                newPin[index - 1] = '';
-                setValues(newPin);
+                updated[index - 1] = '';
+                setValues(updated);
               }
             }
           }}
-          returnKeyType="done"
-          autoFocus={refs === pinRefs && index === 0}
-          selectionColor="#000"
           caretHidden={false}
         />
       ))}
@@ -122,14 +117,14 @@ const CreatePinScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor="#fff" barStyle="dark-content" />
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.inner}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+        style={{ flex: 1 }}
       >
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ alignItems: 'center', justifyContent: 'center' }}
+          contentContainerStyle={styles.scrollContainer}
         >
           <Image
             source={require('../Images/headerimage.jpg')}
@@ -143,20 +138,19 @@ const CreatePinScreen = () => {
             resizeMode="contain"
           />
 
-          <Text style={styles.title}>{t.createPin}</Text>
+          <Text style={styles.title}>Create Your PIN</Text>
 
           <View style={styles.pinContainer}>
-            <Text style={styles.label}>{t.enterPin}</Text>
+            <Text style={styles.label}>Enter PIN</Text>
             {renderPinInputs(pin, setPin, pinRefs)}
 
-            <Text style={styles.label}>{t.confirmPin}</Text>
+            <Text style={styles.label}>Confirm PIN</Text>
             {renderPinInputs(confirmPin, setConfirmPin, confirmPinRefs)}
 
             <TouchableOpacity
               onPress={() => navigation.navigate('LoginScreen')}
-              activeOpacity={0.6}
             >
-              <Text style={styles.forgotText}>{t.forgotPin}</Text>
+              <Text style={styles.forgotText}>Forgot your PIN?</Text>
             </TouchableOpacity>
           </View>
 
@@ -167,9 +161,8 @@ const CreatePinScreen = () => {
             ]}
             onPress={handleSubmit}
             disabled={isSubmitDisabled}
-            activeOpacity={0.8}
           >
-            <Text style={styles.submitText}>{t.submit}</Text>
+            <Text style={styles.submitText}>Submit</Text>
           </TouchableOpacity>
 
           <Image
@@ -185,83 +178,95 @@ const CreatePinScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  inner: { flex: 1, justifyContent: 'space-between', alignItems: 'center' },
-  headerImage: { width: width, height: verticalScale(130) },
-  footerImage: {
-    width: width,
-    height: verticalScale(120),
-    marginTop: verticalScale(20),
-    marginBottom: verticalScale(30),
+
+  scrollContainer: {
+    alignItems: 'center',
+    paddingBottom: verticalScale(40),
   },
+
+  headerImage: {
+    width: '100%',
+    height: verticalScale(140),
+  },
+
   logo: {
-    width: scale(180),
-    height: verticalScale(120),
-    borderRadius: scale(100),
-    marginTop: -verticalScale(5),
+    width: scale(160),
+    height: verticalScale(110),
+    marginTop: -verticalScale(10),
     marginBottom: verticalScale(20),
   },
+
   title: {
-    fontSize: scale(22),
+    fontSize: moderateScale(24),
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: verticalScale(20),
+    marginBottom: verticalScale(15),
   },
+
   pinContainer: {
     width: '100%',
+    paddingHorizontal: width * 0.15,
     alignItems: 'center',
-    paddingHorizontal: scale(75),
   },
+
   label: {
-    fontSize: scale(16),
+    width: '100%',
+    fontSize: moderateScale(16),
     fontWeight: '600',
     color: '#000',
-    marginTop: verticalScale(20),
+    marginTop: verticalScale(15),
     marginBottom: verticalScale(10),
-    alignSelf: 'flex-start',
   },
+
   pinRow: {
+    width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: '100%',
     marginBottom: verticalScale(10),
   },
+
   pinInput: {
-    width: scale(45),
-    height: scale(45),
+    width: scale(50),
+    height: scale(50),
     backgroundColor: '#fff',
     borderRadius: scale(8),
     textAlign: 'center',
-    fontSize: scale(22),
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    color: '#000',
+    fontSize: moderateScale(22),
     borderWidth: 1,
     borderColor: '#ccc',
-  },
-  forgotText: {
-    fontSize: scale(12),
+    elevation: 3,
     color: '#000',
-    marginTop: verticalScale(15),
-    textDecorationLine: 'underline',
-    alignSelf: 'flex-end',
-    marginLeft: scale(150),
-    fontWeight: '700',
   },
+
+  forgotText: {
+    color: '#000',
+    marginTop: verticalScale(10),
+    textDecorationLine: 'underline',
+    fontSize: moderateScale(12),
+    width: '100%',
+    textAlign: 'right',
+    fontWeight: '700',
+    marginLeft: scale(170),
+  },
+
   submitButton: {
     backgroundColor: '#6A5ACD',
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: scale(100),
     borderRadius: scale(10),
-    paddingVertical: verticalScale(14),
-    paddingHorizontal: scale(80),
-    marginTop: verticalScale(30),
-    alignItems: 'center',
+    marginTop: verticalScale(25),
   },
+
   submitText: {
     color: '#fff',
-    fontSize: scale(18),
+    fontSize: moderateScale(18),
     fontWeight: 'bold',
+  },
+
+  footerImage: {
+    width: '100%',
+    height: verticalScale(140),
+    marginTop: verticalScale(30),
   },
 });
 

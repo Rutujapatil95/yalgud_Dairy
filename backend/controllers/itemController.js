@@ -84,12 +84,14 @@ async function getFilteredItems(req, res) {
     const collectionName = req.query.collection || "ItemMaster";
     const limit = parseInt(req.query.limit, 10) || 0;
     // Copy body so we can delete sort params from filters
-    const body = req.body && typeof req.body === "object" ? { ...req.body } : {};
+    const body =
+      req.body && typeof req.body === "object" ? { ...req.body } : {};
 
     if (!Object.keys(body).length) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "Please provide filters in the request body" });
+      return res.status(400).json({
+        ok: false,
+        message: "Please provide filters in the request body",
+      });
     }
 
     // Extract sorting options (if any)
@@ -124,7 +126,14 @@ async function getFilteredItems(req, res) {
         : value;
     });
 
-    console.log("Applied query:", JSON.stringify(query), "SortBy:", sortBy, "Order:", order);
+    console.log(
+      "Applied query:",
+      JSON.stringify(query),
+      "SortBy:",
+      sortBy,
+      "Order:",
+      order
+    );
 
     const db = mongoose.connection.db;
     const coll = db.collection(collectionName);
@@ -149,7 +158,9 @@ async function getFilteredItems(req, res) {
       ok: true,
       collection: collectionName,
       appliedFilters: query,
-      sort: sortBy ? { field: sortBy, order: order === 1 ? "asc" : "desc" } : null,
+      sort: sortBy
+        ? { field: sortBy, order: order === 1 ? "asc" : "desc" }
+        : null,
       count: items.length,
       data: items,
     });
@@ -159,4 +170,238 @@ async function getFilteredItems(req, res) {
   }
 }
 
-module.exports = { getAllItems, getFilteredItems };
+// ✅ Get single item by ItemCode
+async function getItemByItemCode(req, res) {
+  try {
+    if (!mongoose.connection || !mongoose.connection.db) {
+      return res
+        .status(500)
+        .json({ ok: false, message: "Database not connected" });
+    }
+
+    const collectionName = req.query.collection || "ItemMaster";
+    const itemCode = req.params.itemCode;
+
+    if (!itemCode) {
+      return res
+        .status(400)
+        .json({ ok: false, message: "ItemCode is required" });
+    }
+
+    const db = mongoose.connection.db;
+    const coll = db.collection(collectionName);
+
+    // 👇 Try matching as both number and string
+    const query = {
+      $or: [{ ItemCode: Number(itemCode) }, { ItemCode: itemCode }],
+    };
+
+    const item = await coll.findOne(query);
+
+    if (!item) {
+      return res.status(404).json({ ok: false, message: "Item not found" });
+    }
+
+    res.json(item); // ✅ direct full item response (not wrapped)
+  } catch (err) {
+    console.error("getItemByItemCode error:", err);
+    res.status(500).json({ ok: false, message: err.message });
+  }
+}
+
+async function getItemsByItemCategoryCode(req, res) {
+  try {
+    if (!mongoose.connection || !mongoose.connection.db) {
+      return res
+        .status(500)
+        .json({ ok: false, message: "Database not connected" });
+    }
+
+    const collectionName = req.query.collection || "ItemMaster";
+    const categoryCode = req.params.categoryCode;
+
+    if (!categoryCode) {
+      return res
+        .status(400)
+        .json({ ok: false, message: "ItemCategoryCode is required" });
+    }
+
+    const db = mongoose.connection.db;
+    const coll = db.collection(collectionName);
+
+    // 👇 Match number or string type to handle both cases
+    const query = {
+      $or: [
+        { ItemCategoryCode: Number(categoryCode) },
+        { ItemCategoryCode: categoryCode },
+      ],
+    };
+
+    const items = await coll.find(query).toArray();
+
+    if (!items.length) {
+      return res
+        .status(404)
+        .json({
+          ok: false,
+          message: "No items found for this ItemCategoryCode",
+        });
+    }
+
+    // ✅ Directly return full array of items (no wrapper)
+    res.json(items);
+  } catch (err) {
+    console.error("getItemsByItemCategoryCode error:", err);
+    res.status(500).json({ ok: false, message: err.message });
+  }
+}
+
+// ✅ Get one unique item per ItemCategoryCode
+async function getUniqueItemsByCategoryCode(req, res) {
+  try {
+    const { ItemCategoryCode } = req.body || {};
+
+    // ✅ Build base query
+    const query = {};
+    if (ItemCategoryCode !== undefined && ItemCategoryCode !== "") {
+      // handle both single and multiple codes
+      if (Array.isArray(ItemCategoryCode)) {
+        query.ItemCategoryCode = { $in: ItemCategoryCode };
+      } else {
+        query.ItemCategoryCode = ItemCategoryCode;
+      }
+    }
+
+    const db = mongoose.connection.db;
+    if (!db) throw new Error("MongoDB connection not ready yet.");
+
+    const itemColl = db.collection("ItemMaster");
+
+    // ✅ Aggregate to group by ItemCategoryCode and pick one document
+    const pipeline = [
+      { $match: query },
+      {
+        $group: {
+          _id: "$ItemCategoryCode",
+          item: { $first: "$$ROOT" },
+        },
+      },
+      {
+        $replaceRoot: { newRoot: "$item" },
+      },
+      {
+        $project: {
+          _id: 0,
+          ItemCode: 1,
+          ItemName: 1,
+          ItemNameEnglish: 1,
+          ItemCategoryCode: 1,
+          DeptCode: 1,
+          Status: 1,
+          ItemType: 1,
+        },
+      },
+    ];
+
+    const docs = await itemColl.aggregate(pipeline).toArray();
+
+    return res.json({
+      ok: true,
+      message: `✅ Found ${docs.length} unique ItemCategoryCode entries`,
+      count: docs.length,
+      data: docs,
+    });
+  } catch (err) {
+    console.error("❌ Error in getUniqueItemsByCategoryCode:", err);
+    return res.status(500).json({
+      ok: false,
+      message: err.message || "Failed to fetch unique category items",
+    });
+  }
+}
+
+// ✅ One unique item per ItemCategoryCode, grouped by DeptCode
+async function getUniqueItemsByDept(req, res) {
+  try {
+    const { DeptCode } = req.body || {};
+
+    const db = mongoose.connection.db;
+    if (!db) throw new Error("MongoDB connection not ready yet.");
+    const itemColl = db.collection("ItemMaster");
+
+    // ✅ Build query — support both single or multiple departments
+    const query = { Status: 0, ItemType: 2 }; 
+    if (DeptCode !== undefined && DeptCode !== "") {
+      if (Array.isArray(DeptCode)) {
+        query.DeptCode = { $in: DeptCode.map(Number) };
+      } else {
+        query.DeptCode = Number(DeptCode);
+      }
+    }
+
+    // ✅ Aggregate: group by DeptCode + ItemCategoryCode
+    const pipeline = [
+      { $match: query }, // 👈 filter applied here
+      {
+        $group: {
+          _id: {
+            DeptCode: "$DeptCode",
+            ItemCategoryCode: "$ItemCategoryCode",
+          },
+          item: { $first: "$$ROOT" }, // pick first item in each category per dept
+        },
+      },
+      {
+        $replaceRoot: { newRoot: "$item" }, // flatten result
+      },
+      {
+        $sort: { DeptCode: 1, ItemCategoryCode: 1 }, // sort by dept and category
+      },
+      {
+        $project: {
+          _id: 0,
+          ItemCode: 1,
+          ItemName: 1,
+          ItemNameEnglish: 1,
+          ItemCategoryCode: 1,
+          DeptCode: 1,
+          Status: 1,
+          ItemType: 1,
+        },
+      },
+    ];
+
+    const docs = await itemColl.aggregate(pipeline).toArray();
+
+    // ✅ Group results department-wise for clearer structure
+    const grouped = docs.reduce((acc, item) => {
+      const dept = item.DeptCode || "Unknown";
+      if (!acc[dept]) acc[dept] = [];
+      acc[dept].push(item);
+      return acc;
+    }, {});
+
+    return res.json({
+      ok: true,
+      message: `✅ Found ${docs.length} unique category items (Status=0, ItemType=2) grouped by department`,
+      count: docs.length,
+      data: grouped,
+    });
+  } catch (err) {
+    console.error("❌ Error in getUniqueItemsByDept:", err);
+    return res.status(500).json({
+      ok: false,
+      message: err.message || "Failed to fetch department-wise category items",
+    });
+  }
+}
+
+
+module.exports = {
+  getAllItems,
+  getFilteredItems,
+  getItemByItemCode,
+  getItemsByItemCategoryCode,
+  getUniqueItemsByCategoryCode,
+  getUniqueItemsByDept,
+};

@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,12 @@ import {
   Dimensions,
   StatusBar,
   ScrollView,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { useNavigation } from '@react-navigation/native';
-import { LanguageContext } from '../../App';
-import { translations } from '../locales/translations';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -22,8 +23,36 @@ const vScale = size => (height / 812) * size;
 
 const SuccessLoginScreen = () => {
   const navigation = useNavigation();
-  const { lang } = useContext(LanguageContext);
-  const t = translations[lang];
+  const [agentData, setAgentData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const getData = async () => {
+      try {
+        const stored = await AsyncStorage.getItem('agentData');
+        if (stored) setAgentData(JSON.parse(stored));
+      } catch (e) {
+        console.error('Error loading agent data:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    getData();
+  }, []);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ActivityIndicator
+          size="large"
+          color="#007bff"
+          style={{ marginTop: height * 0.45 }}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  const userName = agentData?.AgentName?.split(' ')[0] || 'Dear User';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -33,7 +62,6 @@ const SuccessLoginScreen = () => {
         translucent
       />
 
-      {/* Header Image */}
       <Image
         source={require('../Images/headerimage.jpg')}
         style={styles.headerImage}
@@ -41,31 +69,42 @@ const SuccessLoginScreen = () => {
       />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <ConfettiCannon count={120} origin={{ x: width / 2, y: 0 }} fadeOut />
+        <ConfettiCannon count={140} origin={{ x: width / 2, y: 0 }} fadeOut />
 
-        <Text style={styles.congratsText}>{t.congratsText}</Text>
-        <Text style={styles.subCongratsText}>{t.subCongratsText}</Text>
+        <View style={styles.welcomeCard}>
+          <Text style={styles.welcomeTitle}>Welcome to</Text>
 
-        <Image
-          source={require('../Images/profile.png')}
-          style={styles.profileImage}
-          resizeMode="cover"
-        />
+          <Text style={styles.familyText}>Yalgud Family</Text>
 
-        <Text style={styles.welcomeText}>{t.welcomeText}</Text>
-        <Text style={styles.familyText}>{t.familyText}</Text>
+          <View style={styles.divider} />
+
+          <Text style={styles.userWelcomeText}>
+            We are happy to have you with us,
+          </Text>
+        </View>
 
         <View style={styles.profileCard}>
-          <Text style={styles.shopName}>{t.shopName}</Text>
-          <Text style={styles.shopAddress}>{t.shopAddress}</Text>
+          <Text style={styles.shopName}>
+            {agentData?.AgentName || 'No Name Available'}
+          </Text>
+
+          <Text style={styles.shopAddress}>
+            {agentData?.Address1 && agentData?.Address1 !== '0'
+              ? `${agentData.Address1}, ${agentData.Address2 || ''}`
+              : 'Address not available'}
+          </Text>
         </View>
 
         <TouchableOpacity
           style={styles.continueButton}
-          onPress={() => navigation.navigate('UserDetailsScreen')}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
+          onPress={() =>
+            navigation.navigate('UserDetailsScreen', {
+              agentCode: agentData?.AgentCode,
+            })
+          }
         >
-          <Text style={styles.continueText}>{t.continue}</Text>
+          <Text style={styles.continueText}>Continue</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -80,85 +119,126 @@ const SuccessLoginScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  scrollContent: {
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingHorizontal: scale(16),
+
+  headerImage: {
+    width: width,
+    height: height * 0.16,
   },
-  headerImage: { width: width, height: height * 0.16 },
+
   footerImage: {
     width: width,
     height: height * 0.15,
-    marginTop: height * 0.02,
-    marginBottom: height * 0.02,
-  },
-  congratsText: {
-    fontSize: scale(22),
-    fontWeight: 'bold',
-    color: '#2e2e8b',
-    marginTop: vScale(20),
-    textAlign: 'center',
-  },
-  subCongratsText: {
-    fontSize: scale(16),
-    color: '#000',
-    marginBottom: vScale(10),
-    textAlign: 'center',
-  },
-  profileImage: {
-    width: width * 0.3,
-    height: width * 0.3,
-    borderRadius: (width * 0.3) / 2,
-    borderWidth: 2,
-    borderColor: '#2e2e8b',
-    marginVertical: vScale(10),
-  },
-  welcomeText: {
-    fontSize: scale(20),
-    color: '#000',
-    fontWeight: '600',
     marginTop: vScale(10),
   },
-  familyText: {
-    fontSize: scale(24),
+
+  scrollContent: {
+    alignItems: 'center',
+    paddingHorizontal: scale(16),
+    paddingBottom: vScale(60),
+  },
+
+  congratsEmoji: {
+    fontSize: scale(42),
+    marginBottom: vScale(8),
+  },
+
+  congratsTitle: {
+    fontSize: scale(26),
+    fontWeight: '800',
     color: '#2e2e8b',
-    fontWeight: 'bold',
-    marginBottom: vScale(15),
+  },
+
+  congratsSubtitle: {
+    fontSize: scale(16),
+    color: '#555',
+    marginTop: vScale(8),
     textAlign: 'center',
   },
-  profileCard: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: scale(12),
-    padding: scale(16),
-    width: width * 0.85,
+
+  welcomeCard: {
+    width: width * 0.9,
+    backgroundColor: '#eef2ff',
+    paddingVertical: vScale(30),
+    paddingHorizontal: scale(20),
+    borderRadius: scale(20),
+    marginTop: vScale(30),
     alignItems: 'center',
     elevation: 4,
     shadowColor: '#000',
     shadowOpacity: 0.1,
-    shadowRadius: 5,
-    marginVertical: vScale(20),
+    shadowRadius: 6,
   },
-  shopName: { fontSize: scale(17), fontWeight: 'bold', color: '#333' },
-  shopAddress: {
-    fontSize: scale(13),
+
+  welcomeTitle: {
+    fontSize: scale(20),
     color: '#555',
+  },
+
+  familyText: {
+    fontSize: scale(30),
+    fontWeight: '900',
+    color: '#2e2e8b',
+    marginTop: vScale(5),
+    letterSpacing: 1,
+  },
+
+  divider: {
+    width: '70%',
+    height: 1.8,
+    backgroundColor: '#2e2e8b',
+    marginVertical: vScale(15),
+  },
+
+  userWelcomeText: {
+    fontSize: scale(15),
+    color: '#333',
+  },
+
+  userName: {
+    fontSize: scale(22),
+    fontWeight: '700',
+    color: '#1a1a6e',
+    marginTop: vScale(8),
+  },
+
+  profileCard: {
+    backgroundColor: '#f8f8f8',
+    width: width * 0.9,
+    borderRadius: scale(16),
+    padding: scale(20),
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+    marginTop: vScale(25),
+  },
+
+  shopName: {
+    fontSize: scale(18),
+    fontWeight: 'bold',
+    color: '#111',
+  },
+
+  shopAddress: {
+    fontSize: scale(14),
+    color: '#444',
     marginTop: scale(6),
     textAlign: 'center',
   },
+
   continueButton: {
     backgroundColor: '#007bff',
-    borderRadius: scale(10),
-    paddingVertical: vScale(12),
+    borderRadius: scale(12),
+    paddingVertical: vScale(14),
     paddingHorizontal: width * 0.3,
-    marginTop: vScale(20),
-    minHeight: vScale(44),
-    justifyContent: 'center',
+    marginTop: vScale(48),
   },
+
   continueText: {
     color: '#fff',
-    fontSize: scale(16),
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontSize: scale(18),
+    fontWeight: '700',
   },
 });
 

@@ -1,4 +1,3 @@
-// Home.js
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -10,31 +9,33 @@ import {
   SectionList,
   Dimensions,
   ActivityIndicator,
+  SafeAreaView,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import axios from 'axios';
+import { useSelector } from 'react-redux';
+import { useNavigation, useRoute } from '@react-navigation/native';
 
-const { width, height } = Dimensions.get('window');
+export const BASE_URL = 'http://192.168.1.11:8001';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+const wp = p => SCREEN_WIDTH * (p / 100);
+const hp = p => SCREEN_HEIGHT * (p / 100);
+const isTablet = SCREEN_WIDTH >= 768;
+
+const scale = num => (isTablet ? num * 1.35 : num);
+
 const headerBackgroundColor = '#4A90E2';
-const footerHeight = 60;
+const footerHeight = hp(8);
 
-export const BASE_URL = 'http://192.168.1.5:8000';
+const Home = () => {
+  const cartItems = useSelector(state => state.cart.items || []);
+  const cartCount = cartItems.length;
 
-const Home = ({ navigation }) => {
-  const [activeTab, setActiveTab] = useState('Home');
-
-  const renderScreen = () => {
-    switch (activeTab) {
-      case 'Home':
-        return <ExploreContent navigation={navigation} />;
-      default:
-        return (
-          <View style={styles.centered}>
-            <Text>{activeTab} Screen</Text>
-          </View>
-        );
-    }
-  };
+  const navigation = useNavigation();
+  const route = useRoute();
+  const agentCode = route?.params?.agentCode || 0;
 
   return (
     <View style={styles.safeArea}>
@@ -43,49 +44,58 @@ const Home = ({ navigation }) => {
         barStyle="light-content"
       />
 
-      {/* Header */}
-      <View
-        style={[
-          styles.headerContainer,
-          { backgroundColor: headerBackgroundColor },
-        ]}
-      >
+      <View style={[styles.headerContainer]}>
         <View style={styles.headerRow}>
-          <Ionicons name="menu" size={28} color="#fff" />
+          <Image
+            source={require('../Images/logoto.png')}
+            style={{ width: wp(12), height: wp(12) }}
+          />
+
           <View style={styles.storeInfoContainer}>
             <Text style={styles.storeName}>Jay Bhavani Stores</Text>
             <Text style={styles.location}>Kolhapur</Text>
           </View>
-          <Ionicons name="cart" size={28} color="#fff" />
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate('AddToCartScreen')}
+            style={{ position: 'relative' }}
+          >
+            <Ionicons name="cart" size={scale(28)} color="#fff" />
+            {cartCount > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>
+                  {cartCount > 99 ? '99+' : cartCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Main Content */}
-      <View style={{ flex: 1 }}>{renderScreen()}</View>
+      <ExploreContent agentCode={agentCode} />
 
-      {/* Footer Navigation */}
       <View style={styles.footer}>
-        {['Home', 'History', 'Profile'].map(tab => (
+        {[
+          { tab: 'Home', icon: 'home' },
+          { tab: 'History', icon: 'time' },
+          { tab: 'Template', icon: 'albums' },
+          { tab: 'Profile', icon: 'person' },
+        ].map(({ tab, icon }) => (
           <TouchableOpacity
             key={tab}
             style={styles.navButton}
-            onPress={() => setActiveTab(tab)}
+            onPress={() => {
+              if (tab === 'Template')
+                navigation.navigate('TemplateScreen', { agentCode });
+              else if (tab === 'History')
+                navigation.navigate('HistoryScreen', { agentCode });
+              else if (tab === 'Profile')
+                navigation.navigate('ProfileScreen', { agentCode });
+              else if (tab === 'Home') navigation.navigate('Home');
+            }}
           >
-            <Ionicons
-              name={
-                tab === 'Home' ? 'home' : tab === 'Profile' ? 'person' : 'time'
-              }
-              size={24}
-              color={activeTab === tab ? '#000' : '#fff'}
-            />
-            <Text
-              style={[
-                styles.navText,
-                { color: activeTab === tab ? '#000' : '#fff' },
-              ]}
-            >
-              {tab}
-            </Text>
+            <Ionicons name={icon} size={scale(24)} color="#fff" />
+            <Text style={styles.navText}>{tab}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -93,62 +103,52 @@ const Home = ({ navigation }) => {
   );
 };
 
-const ExploreContent = ({ navigation }) => {
+export default Home;
+
+const ExploreContent = ({ agentCode = 0 }) => {
   const [groupedData, setGroupedData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigation = useNavigation();
 
-  // ✅ Static category map for each DeptCode
-  const STATIC_CATEGORY_MAP = {
-    3: [
-      {
-        id: 1,
-        name: 'Breads',
-        itemCategoryCodes: [4, 5, 8, 6, 9, 11, 12],
-      },
-      { id: 2, name: 'Cakes', itemCategoryCodes: [42] },
-      { id: 3, name: 'Cookies', itemCategoryCodes: [43] },
-    ],
-    16: [
-      { id: 1, name: 'Biscuits & Cakes', itemCategoryCodes: [44] },
-      { id: 2, name: 'Accessories', itemCategoryCodes: [45] },
-      { id: 3, name: 'Flowers', itemCategoryCodes: [46] },
-      { id: 4, name: 'Toys & Gifts', itemCategoryCodes: [47] },
-      { id: 5, name: 'Greeting Cards', itemCategoryCodes: [48] },
-    ],
-    20: [
-      { id: 1, name: 'Snacks', itemCategoryCodes: [49] },
-      { id: 2, name: 'Namkeen', itemCategoryCodes: [50] },
-      { id: 3, name: 'Wafers', itemCategoryCodes: [51] },
-    ],
-  };
+  const getImageUrl = url => url.replace('localhost', '192.168.1.11');
 
   useEffect(() => {
     let isMounted = true;
 
     const fetchCategories = async () => {
       try {
-        const response = await axios.get(`${BASE_URL}/api/categories`);
-        const categories = Array.isArray(response.data) ? response.data : [];
+
+        const response = await axios.get(`${BASE_URL}/api/categories/`);
+        console.log('📦 Fetched Categories:', response.data);
+        const categories = Array.isArray(response.data.data) ? response.data.data : [];
+        console.log('📦 Categories Array:', categories);
 
         const grouped = categories.reduce((acc, item) => {
           const titleEnglish = item.groupTitleEnglish || 'Other';
           const titleMarathi = item.groupTitleMarathi || '';
 
-          const category = {
+          const cat = {
             _id: item._id,
             nameEnglish: item.nameEnglish,
             nameMarathi: item.nameMarathi,
             descriptionEnglish: item.descriptionEnglish,
             descriptionMarathi: item.descriptionMarathi,
-            image: item.image?.startsWith('http')
+            image: item.image.startsWith('http')
               ? item.image
               : `${BASE_URL}/${item.image}`,
             DeptCode: item.DeptCode,
           };
 
-          const existing = acc.find(g => g.titleEnglish === titleEnglish);
-          if (existing) existing.data.push(category);
-          else acc.push({ titleEnglish, titleMarathi, data: [category] });
+          const existingGroup = acc.find(g => g.titleEnglish === titleEnglish);
+
+          existingGroup
+            ? existingGroup.data.push(cat)
+            : acc.push({
+                titleEnglish,
+                titleMarathi,
+                data: [cat],
+              });
+
           return acc;
         }, []);
 
@@ -169,7 +169,7 @@ const ExploreContent = ({ navigation }) => {
       <ActivityIndicator
         size="large"
         color="#4A90E2"
-        style={{ marginTop: 50 }}
+        style={{ marginTop: hp(5) }}
       />
     );
 
@@ -187,26 +187,20 @@ const ExploreContent = ({ navigation }) => {
       renderItem={({ item }) => (
         <TouchableOpacity
           style={styles.card}
-          onPress={() => {
-            console.log('🧾 Navigating with:', {
-              DeptCode: item.DeptCode,
-              Status: 0,
-              ItemType: 2,
-            });
-
+          onPress={() =>
             navigation.navigate('ProductScreen', {
               DeptCode: item.DeptCode,
+              AgentCode: agentCode,
               Status: 0,
               ItemType: 2,
-            });
-          }}
+            })
+          }
         >
           <Image
-            source={{ uri: item.image }}
+            source={{ uri: getImageUrl(item.image) }}
             style={styles.cardImage}
-            resizeMode="cover"
           />
-          <View style={{ flex: 1, paddingLeft: 10 }}>
+          <View style={{ flex: 1, paddingLeft: wp(3) }}>
             <Text style={styles.cardTitle}>{item.nameEnglish}</Text>
             <Text style={styles.cardTitle}>{item.nameMarathi}</Text>
             <Text style={styles.cardDesc}>{item.descriptionEnglish}</Text>
@@ -214,66 +208,116 @@ const ExploreContent = ({ navigation }) => {
           </View>
         </TouchableOpacity>
       )}
-      contentContainerStyle={{ padding: 10, paddingBottom: footerHeight + 20 }}
+      contentContainerStyle={{
+        padding: wp(3),
+        paddingBottom: footerHeight + hp(2),
+      }}
     />
   );
 };
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#fff' },
+
   headerContainer: {
-    paddingTop: height * 0.05,
-    paddingBottom: height * 0.015,
-    paddingHorizontal: width * 0.05,
+    paddingTop: hp(5),
+    paddingBottom: hp(1.5),
+    paddingHorizontal: wp(5),
+    backgroundColor: headerBackgroundColor,
     elevation: 4,
   },
+
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+
   storeInfoContainer: { flex: 1, alignItems: 'center' },
-  storeName: { fontSize: width * 0.05, fontWeight: 'bold', color: '#fff' },
-  location: { fontSize: width * 0.035, color: '#fff' },
+
+  storeName: {
+    fontSize: scale(wp(5)),
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+
+  location: {
+    fontSize: scale(wp(3.5)),
+    color: '#fff',
+  },
+
   footer: {
     flexDirection: 'row',
     position: 'absolute',
     bottom: 0,
-    width: width,
+    width: SCREEN_WIDTH,
     backgroundColor: '#2380FB',
     height: footerHeight,
     justifyContent: 'space-around',
+    alignItems: 'center',
   },
-  navButton: { flex: 1, alignItems: 'center', paddingVertical: 6 },
-  navText: { fontSize: width * 0.03, fontWeight: 'bold', marginTop: 2 },
+
+  navButton: { flex: 1, alignItems: 'center' },
+  navText: {
+    fontSize: scale(wp(3)),
+    color: '#fff',
+    fontWeight: 'bold',
+    marginTop: hp(0.5),
+  },
+
   sectionHeader: {
     backgroundColor: '#4A90E2',
-    padding: 8,
-    borderRadius: 8,
-    marginTop: 15,
+    padding: hp(1.2),
+    borderRadius: scale(8),
+    marginTop: hp(2),
   },
+
   sectionHeaderText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: width * 0.042,
+    fontSize: scale(wp(4)),
   },
+
   card: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
+    borderRadius: scale(12),
+    padding: wp(3),
+    marginBottom: hp(1.5),
     elevation: 2,
   },
+
   cardImage: {
-    width: width * 0.35,
-    height: height * 0.18,
-    borderRadius: 10,
+    width: wp(35),
+    height: hp(17),
+    borderRadius: scale(10),
     backgroundColor: '#eee',
   },
-  cardTitle: { fontWeight: 'bold', fontSize: width * 0.043 },
-  cardDesc: { fontSize: width * 0.037, color: '#555' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-});
 
-export default Home;
+  cardTitle: {
+    fontWeight: 'bold',
+    fontSize: scale(wp(4.3)),
+  },
+
+  cardDesc: {
+    fontSize: scale(wp(3.7)),
+    color: '#555',
+  },
+
+  cartBadge: {
+    position: 'absolute',
+    right: -8,
+    top: -5,
+    backgroundColor: 'red',
+    borderRadius: scale(10),
+    width: scale(18),
+    height: scale(18),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cartBadgeText: {
+    color: '#fff',
+    fontSize: scale(10),
+    fontWeight: 'bold',
+  },
+});

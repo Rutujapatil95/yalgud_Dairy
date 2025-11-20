@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,78 +14,126 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-} from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
-import { useNavigation } from "@react-navigation/native";
+} from 'react-native';
 
-// Get screen dimensions
-const { width, height } = Dimensions.get("window");
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import { useNavigation } from '@react-navigation/native';
 
-// Utility scale functions (make all sizes responsive)
-const scale = (size) => (width / 375) * size; // 375 = base iPhone width
-const verticalScale = (size) => (height / 812) * size; // 812 = base iPhone height
+const { width, height } = Dimensions.get('window');
+const scale = size => (width / 375) * size;
+const verticalScale = size => (height / 812) * size;
 const moderateScale = (size, factor = 0.5) =>
   size + (scale(size) - size) * factor;
 
 const LoginScreen = () => {
   const navigation = useNavigation();
-  const [agentCode, setAgentCode] = useState("");
+  const [agentCode, setAgentCode] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Auto navigation if logged in
   useEffect(() => {
     const checkAgentData = async () => {
       try {
-        const storedData = await AsyncStorage.getItem("agentData");
-        if (storedData) {
+        const savedCode = await AsyncStorage.getItem('agentCode');
+        const savedAgent = await AsyncStorage.getItem('agentData');
+
+        if (savedCode && savedAgent) {
           navigation.reset({
             index: 0,
-            routes: [{ name: "EnterScreen" }],
+            routes: [{ name: 'EnterScreen' }],
           });
         }
       } catch (err) {
-        console.error("Error checking agentData:", err);
+        console.error('❌ Error checking agent data:', err);
       }
     };
+
     checkAgentData();
   }, [navigation]);
 
-  // Submit Handler
   const handleSubmit = async () => {
     if (!agentCode.trim()) {
-      Alert.alert("त्रुटी", "कृपया आपला एजंट कोड प्रविष्ट करा");
+      Alert.alert('Error', 'Please enter your agent code.');
       return;
     }
 
     setLoading(true);
+
     try {
+      console.log('🚀 Sending API Request...');
+      console.log(`URL → http://192.168.1.11:8001/api/agent/${agentCode}`);
+
       const response = await axios.get(
-        `http://192.168.1.5:8000/api/agent/${agentCode}`
+        `http://192.168.1.11:8001/api/agent/${agentCode}`,
       );
+
+      console.log('📥 API Response:', response.data);
 
       if (response.data.success) {
         const agentData = response.data.data;
-        await AsyncStorage.setItem("agentData", JSON.stringify(agentData));
 
-        Alert.alert("सफल", response.data.message, [
+        console.log('📦 Agent Data Received:', agentData);
+
+        await AsyncStorage.multiSet([
+          ['agentCode', agentCode],
+          ['agentData', JSON.stringify(agentData)],
+
+          ['agentName', agentData.AgentName || ''],
+          ['agentNameEng', agentData.AgentNameEng || ''],
+          ['agentAddress1', agentData.Address1 || ''],
+          ['agentAddress2', agentData.Address2 || ''],
+          ['agentVillageCode', String(agentData.VillageCode || '')],
+          ['agentPhone', agentData.Phone || ''],
+          ['agentMobile', agentData.Mobile || ''],
+          ['agentEmail', agentData.Email || ''],
+          ['agentLicNo', agentData.LicNo || ''],
+          ['agentExpDate', agentData.ExpDate || ''],
+          ['agentDepositAmt', String(agentData.DepositAmt || '')],
+          ['agentSalesRoute', String(agentData.SalesRouteCode || '')],
+          [
+            'SalesRateChartEntryNo',
+            String(agentData.SalesRateChartEntryNo || '1'),
+          ],
+
+          ['agentCloseStatus', agentData.CloseStatus || ''],
+          ['agentPAN', agentData.PANo || ''],
+          ['agentTIN', agentData.CSTTIN || ''],
+          ['agentVATTIN', agentData.VATTIN || ''],
+          ['agentSTNO', agentData.STNO || ''],
+
+          ['agentType', agentData.AgentType.toString()],
+
+          ['agentDiscPer', String(agentData.DiscPer || '')],
+          ['agentAadhar', agentData.AadharNo || ''],
+          ['agentBankCode', String(agentData.BankCode || '')],
+          ['agentBdisc', String(agentData.Bdisc || '')],
+          ['agentDdisc', String(agentData.Ddisc || '')],
+          ['agentSdisc', String(agentData.Sdisc || '')],
+          ['agentHdisc', String(agentData.Hdisc || '')],
+        ]);
+
+        console.log('💾 ALL Agent Info Saved Successfully!');
+
+        Alert.alert('Success', 'Agent verified successfully.', [
           {
-            text: "ठीक आहे",
+            text: 'OK',
             onPress: () =>
               navigation.reset({
                 index: 0,
-                routes: [{ name: "CreatePinScreen", params: { agentCode } }],
+                routes: [{ name: 'CreatePinScreen', params: { agentCode } }],
               }),
           },
         ]);
       } else {
-        Alert.alert("त्रुटी", response.data.message || "एजंट कोड सापडला नाही");
+        Alert.alert('Error', response.data.message || 'Agent code not found.');
       }
     } catch (error) {
-      console.log(error.response?.data || error.message);
+      console.error('❌ API Error:', error.response?.data || error.message);
+
       Alert.alert(
-        "त्रुटी",
-        error.response?.data?.message || "सर्व्हरशी कनेक्शनमध्ये समस्या."
+        'Error',
+        error.response?.data?.message ||
+          'There was a problem connecting to the server.',
       );
     } finally {
       setLoading(false);
@@ -98,40 +146,38 @@ const LoginScreen = () => {
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header Image */}
           <Image
-            source={require("../Images/headerimage.jpg")}
+            source={require('../Images/headerimage.jpg')}
             style={styles.headerImage}
             resizeMode="cover"
           />
 
           <View style={styles.innerContainer}>
-            {/* Logo */}
             <Image
-              source={require("../Images/logoto.png")}
+              source={require('../Images/logoto.png')}
               style={styles.logo}
               resizeMode="contain"
             />
 
-            {/* Agent Code Input */}
             <Text style={styles.label}>Agent Code</Text>
+
             <TextInput
               placeholder="Enter your agent code"
               value={agentCode}
               onChangeText={setAgentCode}
               style={styles.input}
+              keyboardType="numeric"
               autoCapitalize="none"
               placeholderTextColor="#999"
             />
 
-            {/* Submit Button */}
             <TouchableOpacity
               onPress={handleSubmit}
               disabled={loading}
@@ -144,24 +190,10 @@ const LoginScreen = () => {
                 <Text style={styles.submitText}>Submit</Text>
               )}
             </TouchableOpacity>
-
-            {/* Marathi Text */}
-            <View style={styles.textContainer}>
-              <Text style={styles.marathiText}>
-                यलगुड ची उत्पादने खरेदी करण्यास तुम्ही उत्सुक आहात का
-              </Text>
-
-              <TouchableOpacity
-                onPress={() => navigation.navigate("SignupScreen")}
-              >
-                <Text style={styles.clickHere}>येथे क्लिक करा</Text>
-              </TouchableOpacity>
-            </View>
           </View>
 
-          {/* Footer Image */}
           <Image
-            source={require("../Images/footerimage.png")}
+            source={require('../Images/footerimage.png')}
             style={styles.footerImage}
             resizeMode="cover"
           />
@@ -171,84 +203,65 @@ const LoginScreen = () => {
   );
 };
 
-
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: '#fff',
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: "space-between",
+    justifyContent: 'space-between',
   },
   headerImage: {
-    width: "100%",
+    width: '100%',
     height: verticalScale(180),
   },
   innerContainer: {
-    flex: 1,
-    alignItems: "center",
+    width: '100%',
+    alignItems: 'center',
     paddingHorizontal: width * 0.08,
     marginTop: verticalScale(20),
   },
   logo: {
-    width: scale(140),
-    height: scale(140),
+    width: width * 0.35,
+    height: width * 0.35,
     marginBottom: verticalScale(20),
   },
   label: {
-    alignSelf: "flex-start",
+    alignSelf: 'flex-start',
     fontSize: moderateScale(17),
-    fontWeight: "600",
-    color: "#000",
+    fontWeight: '600',
+    color: '#000',
     marginBottom: verticalScale(8),
   },
   input: {
-    width: "100%",
+    width: '100%',
     height: verticalScale(50),
     borderWidth: 1.5,
-    borderColor: "#056BF1",
-    borderRadius: 2,
+    borderColor: '#056BF1',
+    borderRadius: 8,
     paddingHorizontal: scale(15),
     fontSize: moderateScale(18),
-    color: "#000",
-    backgroundColor: "#F8F9FF",
+    color: '#000',
+    backgroundColor: '#F8F9FF',
     marginBottom: verticalScale(20),
   },
   submitBtn: {
-    backgroundColor: "#056BF1",
-    height: verticalScale(40),
+    width: '100%',
+    backgroundColor: '#056BF1',
+    height: verticalScale(48),
     borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    width: "100%",
+    justifyContent: 'center',
+    alignItems: 'center',
     elevation: 5,
   },
   submitText: {
-    color: "#fff",
+    color: '#fff',
     fontSize: moderateScale(18),
-    fontWeight: "700",
-  },
-  textContainer: {
-    marginTop: verticalScale(12),
-    alignItems: "center",
-  },
-  marathiText: {
-    color: "#000",
-    textAlign: "center",
-    fontSize: moderateScale(14.5),
-    lineHeight: verticalScale(22),
-    paddingHorizontal: width * 0.05,
-  },
-  clickHere: {
-    color: "#056BF1",
-    fontWeight: "bold",
-    fontSize: moderateScale(15),
-    marginTop: verticalScale(5),
-    textDecorationLine: "underline",
+    fontWeight: '700',
   },
   footerImage: {
-    width: "100%",
+    width: '100%',
     height: verticalScale(150),
     marginTop: verticalScale(30),
   },

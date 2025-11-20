@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,441 +6,444 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
-  Dimensions,
-  TextInput,
+  SafeAreaView,
+  StatusBar,
+  Image,
   Alert,
+  Dimensions,
 } from 'react-native';
+
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import axios from 'axios';
-import { BASE_URL } from '../Screens/home';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const BASE_WIDTH = 375; // Reference design width
-const BASE_HEIGHT = 812; // Reference design height
-const scale = size => (SCREEN_WIDTH / BASE_WIDTH) * size;
-const verticalScale = size => (SCREEN_HEIGHT / BASE_HEIGHT) * size;
+const wp = p => (SCREEN_WIDTH * p) / 100;
+const hp = p => (SCREEN_HEIGHT * p) / 100;
+const isTablet = SCREEN_WIDTH >= 768;
+const scale = v => (isTablet ? v * 1.3 : v);
 
-const ITEMS_PER_PAGE = 8;
+const PRIMARY = '#2380FB';
+const PAGE_BG = '#F9FAFB';
+const CARD_BG = '#FFFFFF';
+const GRAY = '#444';
 
-const ProductScreen = ({ route }) => {
-  const { DeptCode, Status, ItemType } = route.params || {};
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [selectedItems, setSelectedItems] = useState([]);
+const FOOTER_HEIGHT = hp(8);
+const ITEMS_PER_PAGE = 6;
+
+const API_URL = 'http://192.168.1.11:8001/api/newcategories';
+
+const ProductScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute();
+
+  const deptCode = route.params?.DeptCode ?? route.params?.deptCode ?? null;
+  const agentCode = route.params?.AgentCode ?? route.params?.agentCode ?? null;
+
+  const [agentType, setAgentType] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('Home');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const cartItems = useSelector(state => state.cart.items || []);
+  const cartCount = cartItems.length;
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchAgentType = async () => {
       try {
-        console.log('📦 Fetching products for:', {
-          DeptCode,
-          Status,
-          ItemType,
-        });
+        const storedType = await AsyncStorage.getItem('agentType');
+        console.log('📌 Loaded agentType:', storedType);
 
-        const response = await axios.post(`${BASE_URL}/api/items/filter`, {
-          DeptCode,
-          Status,
-          ItemType,
-        });
-
-        const productData = response.data?.data || [];
-
-        const productsWithPrices = await Promise.all(
-          productData.map(async item => {
-            try {
-              const priceResponse = await axios.post(
-                `${BASE_URL}/api/data/filter?collection=SalesRateChart`,
-                {
-                  ItemCode: item.ItemCode,
-                  EntryNo: 1,
-                },
-              );
-
-              const salesData = priceResponse.data?.data?.[0];
-              const agentRate = salesData?.AgentRate || 0;
-              const salesRate = salesData?.SalesRate || 0;
-              const finalRate =
-                agentRate && agentRate !== 0 ? agentRate : salesRate || 'N/A';
-
-              return { ...item, price: finalRate, quantity: 0 };
-            } catch (error) {
-              console.warn(
-                `⚠️ Error fetching price for ItemCode ${item.ItemCode}:`,
-                error.message,
-              );
-              return { ...item, price: 'N/A', quantity: 0 };
-            }
-          }),
-        );
-
-        setProducts(productsWithPrices);
+        setAgentType(storedType ? Number(storedType) : 0);
       } catch (err) {
-        console.error('❌ Error fetching products:', err.message);
-        setProducts([]);
+        console.log('❌ Failed to load agentType:', err);
+        setAgentType(0);
+      }
+    };
+
+    fetchAgentType();
+  }, []);
+
+  useEffect(() => {
+    console.log(' ProductScreen Params:', {
+      deptCode,
+      agentCode,
+      agentType,
+    });
+  }, [deptCode, agentCode, agentType]);
+
+  const fixImageUrl = url => {
+    if (!url) return null;
+    if (url.includes('localhost'))
+      return url.replace('localhost', '192.168.1.11');
+    return url;
+  };
+
+  const goToCategoryProducts = categoryCode => {
+    navigation.navigate('CategoryProductsScreen', {
+      ItemCategoryCode: categoryCode,
+      DeptCode: deptCode,
+      AgentCode: agentCode,
+    });
+  };
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      setLoading(true);
+
+      try {
+        const response = await axios.get(API_URL);
+
+        let data = [];
+        if (Array.isArray(response.data)) data = response.data;
+        else if (Array.isArray(response.data.categories))
+          data = response.data.categories;
+
+        if (deptCode) {
+          data = data.filter(cat => String(cat.DeptCode) === String(deptCode));
+        }
+
+        setCategories(data);
+      } catch (err) {
+        console.log('❌ Failed to load categories:', err);
+        Alert.alert('Error', 'Failed to load categories.');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchProducts();
-  }, [DeptCode, Status, ItemType]);
+    loadCategories();
+  }, [deptCode]);
 
-  const totalPages = Math.ceil(products.length / ITEMS_PER_PAGE);
-  const handleNextPage = () => {
-    if (currentPage < totalPages) setCurrentPage(prev => prev + 1);
-  };
-  const handlePrevPage = () => {
-    if (currentPage > 1) setCurrentPage(prev => prev - 1);
-  };
+  const totalPages = Math.max(1, Math.ceil(categories.length / ITEMS_PER_PAGE));
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedProducts = products.slice(
+
+  const paginatedCategories = categories.slice(
     startIndex,
     startIndex + ITEMS_PER_PAGE,
   );
 
-  const toggleSelectItem = item => {
-    setSelectedItems(prev => {
-      const exists = prev.find(p => p.ItemCode === item.ItemCode);
-      if (exists) {
-        return prev.filter(p => p.ItemCode !== item.ItemCode);
-      } else {
-        return [...prev, { ...item }];
-      }
-    });
-  };
-
-  const updateQuantity = (item, qty) => {
-    let updatedQty = parseInt(qty);
-    if (isNaN(updatedQty) || updatedQty < 0) updatedQty = 0;
-
-    setProducts(prev =>
-      prev.map(p =>
-        p.ItemCode === item.ItemCode ? { ...p, quantity: updatedQty } : p,
-      ),
-    );
-
-    setSelectedItems(prev => {
-      const exists = prev.find(p => p.ItemCode === item.ItemCode);
-      if (exists) {
-        return prev.map(p =>
-          p.ItemCode === item.ItemCode ? { ...p, quantity: updatedQty } : p,
-        );
-      } else {
-        return [...prev];
-      }
-    });
-  };
-
-  const totalAmount = useMemo(() => {
-    return selectedItems.reduce((acc, item) => {
-      const price = parseFloat(item.price) || 0;
-      const qty = item.quantity || 0;
-      return acc + price * qty;
-    }, 0);
-  }, [selectedItems]);
-
-  const goToCheckout = () => {
-    const validItems = selectedItems.filter(
-      item => item.quantity > 0 && item.price !== 'N/A',
-    );
-
-    if (validItems.length === 0) {
-      Alert.alert(
-        'Alert',
-        'Please select items with valid quantity and price.',
-      );
-      return;
-    }
-
-    navigation.navigate('CheckoutScreen', { selectedItems: validItems });
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading products...</Text>
-      </View>
-    );
-  }
-
-  if (products.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>
-          No products found for this department.
-        </Text>
-      </View>
-    );
-  }
-
   const renderItem = ({ item }) => {
-    const isSelected = selectedItems.some(p => p.ItemCode === item.ItemCode);
+    const firstItem = item.categoryItems?.[0];
 
     return (
       <TouchableOpacity
         activeOpacity={0.85}
-        style={[
-          styles.card,
-          isSelected && {
-            borderLeftColor: '#28A745',
-            backgroundColor: '#E8F5E9',
-          },
-        ]}
-        onPress={() => toggleSelectItem(item)}
+        style={styles.card}
+        onPress={() =>
+          firstItem && goToCategoryProducts(firstItem.ItemCategoryCode)
+        }
       >
-        <View style={styles.rowBetween}>
-          <Text style={styles.itemCode}>Item Code: {item.ItemCode}</Text>
-          <Text style={styles.itemPrice}>
-            ₹ {item.price !== 'N/A' ? item.price : '--'}
-          </Text>
-        </View>
-
-        <Text style={styles.itemNameEnglish}>
-          {item.ItemNameEnglish || 'N/A'}
-        </Text>
-        <Text style={styles.itemNameMarathi}>{item.ItemName || 'N/A'}</Text>
-
-        <View style={styles.qtyContainer}>
-          <Text style={styles.qtyLabel}>Qty:</Text>
-          <TextInput
-            style={styles.qtyInput}
-            keyboardType="numeric"
-            value={String(item.quantity)}
-            onChangeText={text => updateQuantity(item, text)}
+        <View style={styles.cardContent}>
+          <Image
+            source={{ uri: fixImageUrl(item.imagePath) }}
+            style={styles.cardImage}
+            resizeMode="cover"
           />
+
+          <View style={styles.cardTextContainer}>
+            <Text style={styles.cardTitle}>{item.categoryName}</Text>
+            <Text style={styles.cardSubtitle} numberOfLines={2}>
+              {item.description || 'No description available'}
+            </Text>
+          </View>
+
+          <Ionicons name="chevron-forward" size={scale(24)} color={PRIMARY} />
         </View>
-
-        <Text style={styles.totalText}>
-          Total: ₹{' '}
-          {item.price !== 'N/A'
-            ? (item.price * item.quantity).toFixed(2)
-            : '--'}
-        </Text>
-
-        {isSelected && <Text style={styles.selectedText}>✔ Selected</Text>}
-        <View style={styles.divider} />
       </TouchableOpacity>
     );
   };
 
+  if (loading || agentType === null) {
+    return (
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color={PRIMARY} />
+        <Text style={{ marginTop: hp(1), color: GRAY }}>
+          Loading categories...
+        </Text>
+      </View>
+    );
+  }
+
+  if (categories.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={{ color: GRAY, fontSize: scale(16) }}>
+          No categories found.
+        </Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.headerTitle}>Product List</Text>
-      <Text style={styles.headerSubtitle}>Department Code: {DeptCode}</Text>
-      <Text style={styles.pageIndicator}>
-        Page {currentPage} / {totalPages}
-      </Text>
+    <SafeAreaView style={styles.safe}>
+      <StatusBar backgroundColor={PRIMARY} barStyle="light-content" />
 
-      <FlatList
-        data={paginatedProducts}
-        keyExtractor={(item, index) => `${item.ItemCode}-${index}`}
-        renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: scale(120) }}
-      />
-
-      <View style={styles.bottomContainer}>
-        <View style={styles.arrowContainer}>
-          <TouchableOpacity
-            onPress={handlePrevPage}
-            disabled={currentPage === 1}
-            style={[
-              styles.arrowButton,
-              currentPage === 1 && styles.disabledArrow,
-            ]}
-          >
-            <Ionicons
-              name="chevron-back-circle"
-              size={scale(44)}
-              color="#fff"
-            />
-          </TouchableOpacity>
+      {/* HEADER */}
+      <View style={styles.header}>
+        <View style={styles.headerRow}>
+          <Image
+            source={require('../Images/logoto.png')}
+            style={{ width: wp(10), height: wp(10) }}
+          />
+          <View style={styles.storeInfoContainer}>
+            <Text style={styles.storeName}>Jay Bhavani Stores</Text>
+            <Text style={styles.location}>Kolhapur</Text>
+          </View>
 
           <TouchableOpacity
-            onPress={handleNextPage}
-            disabled={currentPage === totalPages}
-            style={[
-              styles.arrowButton,
-              currentPage === totalPages && styles.disabledArrow,
-            ]}
+            onPress={() =>
+              navigation.navigate('AddToCartScreen', {
+                agentCode,
+                deptCode,
+              })
+            }
+            style={{ position: 'relative' }}
           >
-            <Ionicons
-              name="chevron-forward-circle"
-              size={scale(44)}
-              color="#fff"
-            />
+            <Ionicons name="cart" size={scale(28)} color="#fff" />
+
+            {cartCount > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>
+                  {cartCount > 99 ? '99+' : cartCount}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
+      </View>
 
-        <Text style={styles.totalAmountText}>
-          Total Amount: ₹ {totalAmount.toFixed(2)}
+      {/* TITLE */}
+      <View style={styles.titleContainer}>
+        <Text style={styles.pageTitle}>Categories</Text>
+        <Text style={styles.pageSubtitle}>
+          Department Code: {deptCode || '-'}
+        </Text>
+      </View>
+
+      {/* LIST */}
+      <FlatList
+        data={paginatedCategories}
+        renderItem={renderItem}
+        keyExtractor={item =>
+          item._id ? String(item._id) : Math.random().toString()
+        }
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingBottom: FOOTER_HEIGHT + hp(6),
+          paddingHorizontal: wp(3),
+        }}
+      />
+
+      {/* PAGINATION */}
+      <View style={styles.pagination}>
+        <TouchableOpacity
+          disabled={currentPage === 1}
+          onPress={() => setCurrentPage(prev => prev - 1)}
+          style={[
+            styles.pageButton,
+            currentPage === 1 && styles.disabledButton,
+          ]}
+        >
+          <Ionicons name="chevron-back" size={scale(18)} color={PRIMARY} />
+        </TouchableOpacity>
+
+        <Text style={styles.pageText}>
+          {currentPage} / {totalPages}
         </Text>
 
         <TouchableOpacity
-          style={styles.checkoutButton}
-          onPress={goToCheckout}
-          activeOpacity={0.9}
+          disabled={currentPage === totalPages}
+          onPress={() => setCurrentPage(prev => prev + 1)}
+          style={[
+            styles.pageButton,
+            currentPage === totalPages && styles.disabledButton,
+          ]}
         >
-          <Text style={styles.checkoutText}>
-            Go to Checkout ({selectedItems.length})
-          </Text>
+          <Ionicons name="chevron-forward" size={scale(18)} color={PRIMARY} />
         </TouchableOpacity>
       </View>
-    </View>
+
+      {/* FOOTER */}
+      <View style={styles.footer}>
+        {[
+          { tab: 'Home', icon: 'home' },
+          { tab: 'History', icon: 'time' },
+          { tab: 'Template', icon: 'albums' },
+          { tab: 'Profile', icon: 'person' },
+        ].map(({ tab, icon }) => (
+          <TouchableOpacity
+            key={tab}
+            style={styles.navButton}
+            onPress={() => {
+              setActiveTab(tab);
+
+              if (tab === 'Home') navigation.navigate('home');
+              if (tab === 'History') navigation.navigate('HistoryScreen');
+              if (tab === 'Template') navigation.navigate('TemplateScreen');
+              if (tab === 'Profile') navigation.navigate('ProfileScreen');
+            }}
+          >
+            <Ionicons
+              name={icon}
+              size={scale(22)}
+              color={activeTab === tab ? '#000' : '#fff'}
+            />
+            <Text
+              style={[
+                styles.navText,
+                { color: activeTab === tab ? '#000' : '#fff' },
+              ]}
+            >
+              {tab}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </SafeAreaView>
   );
 };
 
+export default ProductScreen;
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-    paddingHorizontal: scale(12),
-    paddingTop: verticalScale(20),
-  },
-  headerTitle: {
-    fontSize: scale(22),
-    fontWeight: '700',
-    color: '#007AFF',
-    textAlign: 'center',
-    marginTop: verticalScale(20),
-  },
-  headerSubtitle: {
-    textAlign: 'center',
-    fontSize: scale(14),
-    color: '#777',
-    marginBottom: verticalScale(8),
-  },
-  pageIndicator: {
-    textAlign: 'center',
-    fontSize: scale(16),
-    fontWeight: '600',
-    color: '#007AFF',
-    marginBottom: verticalScale(8),
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: scale(14),
-    padding: scale(11),
-    marginVertical: verticalScale(8),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: verticalScale(1) },
-    shadowOpacity: 0.12,
-    shadowRadius: scale(4),
-    elevation: 3,
-    borderLeftWidth: scale(4),
-    borderLeftColor: '#007AFF',
-  },
-  itemCode: { fontSize: scale(14), fontWeight: 'bold', color: '#007AFF' },
-  itemNameEnglish: {
-    fontSize: scale(16),
-    fontWeight: '600',
-    color: '#333',
-    marginTop: verticalScale(6),
-  },
-  itemNameMarathi: {
-    fontSize: scale(14),
-    color: '#666',
-    marginTop: verticalScale(2),
-  },
-  itemPrice: { fontSize: scale(16), fontWeight: 'bold', color: '#28A745' },
-  qtyContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: verticalScale(4),
-  },
-  qtyLabel: {
-    fontSize: scale(15),
-    fontWeight: '500',
-    color: '#333',
-    marginRight: scale(10),
-  },
-  qtyInput: {
-    width: scale(50),
-    height: verticalScale(46),
-    borderWidth: 1.5,
-    borderColor: '#007AFF',
-    borderRadius: scale(8),
-    textAlign: 'center',
-    fontSize: scale(16),
-    color: '#000',
-    backgroundColor: '#F8FAFF',
-  },
-  totalText: {
-    color: '#000',
-    fontWeight: '600',
-    marginTop: verticalScale(8),
-    fontSize: scale(15),
-  },
-  selectedText: {
-    color: '#28A745',
-    fontWeight: 'bold',
-    marginTop: verticalScale(6),
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginVertical: verticalScale(8),
-  },
-  rowBetween: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  bottomContainer: {
-    position: 'absolute',
-    bottom: verticalScale(10),
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  checkoutButton: {
-    backgroundColor: '#28A745',
-    paddingVertical: verticalScale(12),
-    paddingHorizontal: scale(30),
-    borderRadius: scale(25),
-    elevation: 4,
-    marginTop: verticalScale(10),
-  },
-  checkoutText: { color: '#fff', fontWeight: '700', fontSize: scale(16) },
-  totalAmountText: {
-    fontSize: scale(18),
-    fontWeight: '700',
-    color: '#007AFF',
-    marginTop: verticalScale(8),
-  },
-  arrowContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: SCREEN_WIDTH * 0.8,
-  },
-  arrowButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: scale(50),
+  safe: { flex: 1, backgroundColor: PAGE_BG },
+
+  header: {
+    backgroundColor: PRIMARY,
+    paddingTop: hp(4.5),
+    paddingBottom: hp(1.4),
+    paddingHorizontal: wp(4.5),
     elevation: 5,
-    padding: scale(4),
   },
-  disabledArrow: { backgroundColor: '#A0AEC0' },
+
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+
+  storeInfoContainer: { flex: 1, alignItems: 'center' },
+
+  storeName: {
+    fontSize: scale(wp(5)),
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+
+  location: { fontSize: scale(wp(3.5)), color: '#fff' },
+
+  cartBadge: {
+    position: 'absolute',
+    right: -scale(8),
+    top: -scale(6),
+    backgroundColor: 'red',
+    borderRadius: scale(10),
+    width: scale(18),
+    height: scale(18),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  cartBadgeText: {
+    color: '#fff',
+    fontSize: scale(wp(2.4)),
+    fontWeight: 'bold',
+  },
+
+  titleContainer: { alignItems: 'center', marginVertical: hp(1.5) },
+
+  pageTitle: {
+    fontSize: scale(wp(4.8)),
+    fontWeight: '700',
+    color: '#0A2540',
+  },
+
+  pageSubtitle: {
+    fontSize: scale(wp(3.4)),
+    color: GRAY,
+    marginTop: hp(0.5),
+  },
+
   loaderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
   },
-  loadingText: {
-    marginTop: verticalScale(10),
-    color: '#555',
-    fontSize: scale(16),
-  },
+
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F2F4F7',
   },
-  emptyText: { color: '#666', fontSize: scale(16) },
-});
 
-export default ProductScreen;
+  card: {
+    backgroundColor: CARD_BG,
+    borderRadius: scale(12),
+    padding: wp(3),
+    marginVertical: hp(1),
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 3,
+  },
+
+  cardContent: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+
+  cardImage: {
+    width: wp(18),
+    height: wp(18),
+    borderRadius: scale(10),
+    marginRight: wp(3),
+    backgroundColor: '#eee',
+  },
+
+  cardTextContainer: { flex: 1 },
+
+  cardTitle: {
+    fontSize: scale(wp(4.2)),
+    fontWeight: '600',
+    color: '#0A2540',
+    marginBottom: hp(0.4),
+  },
+
+  cardSubtitle: {
+    fontSize: scale(wp(3.6)),
+    color: GRAY,
+  },
+
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: hp(1.2),
+  },
+
+  pageButton: { padding: wp(2) },
+
+  pageText: {
+    fontSize: scale(wp(4)),
+    marginHorizontal: wp(3),
+    fontWeight: '600',
+    color: PRIMARY,
+  },
+
+  disabledButton: { opacity: 0.4 },
+
+  footer: {
+    height: FOOTER_HEIGHT,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: PRIMARY,
+  },
+
+  navButton: { alignItems: 'center' },
+
+  navText: {
+    fontSize: scale(wp(3.2)),
+    marginTop: hp(0.4),
+  },
+});

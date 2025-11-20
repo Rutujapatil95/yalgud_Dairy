@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useContext } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -14,35 +14,39 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { LanguageContext } from '../../App';
-import { translations } from '../locales/translations';
+import { useNavigation, useRoute } from '@react-navigation/native';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const MAX_CONTENT_WIDTH = 600;
+const MAX_CONTENT_WIDTH = 650;
 
-const BASE_URL =
-  Platform.OS === 'android'
-    ? 'http://10.0.2.2:8000'
-    : 'http://192.168.1.21:8000';
+const BASE_URL = 'http://192.168.1.11:8001';
+
+const wp = p => SCREEN_WIDTH * (p / 100);
+const hp = p => SCREEN_HEIGHT * (p / 100);
+
+const isTablet = SCREEN_WIDTH >= 768;
+
+const scale = value => {
+  if (isTablet) return value * 1.35;
+  return value;
+};
 
 const Offerscreen = () => {
   const navigation = useNavigation();
-  const { lang } = useContext(LanguageContext);
-  const t = translations[lang];
+  const route = useRoute();
 
-  const flatListRef = useRef();
+  const flatListRef = useRef();0
   const [offers, setOffers] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  const { agentCode } = route.params || {};
 
   useEffect(() => {
     const fetchOffers = async () => {
       try {
         const response = await fetch(`${BASE_URL}/api/advertisements/`);
         const data = await response.json();
-
-        console.log('📢 Offers API Response:', data);
 
         const updatedData = data.map(item => ({
           ...item,
@@ -53,7 +57,7 @@ const Offerscreen = () => {
 
         setOffers(updatedData);
       } catch (error) {
-        console.error('❌ Error fetching advertisements:', error);
+        console.log('❌ Error fetching advertisements:', error);
       } finally {
         setLoading(false);
       }
@@ -64,6 +68,7 @@ const Offerscreen = () => {
 
   useEffect(() => {
     if (offers.length === 0) return;
+
     const interval = setInterval(() => {
       const nextIndex = (currentIndex + 1) % offers.length;
       flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
@@ -80,17 +85,18 @@ const Offerscreen = () => {
 
   const renderOfferItem = ({ item, index }) => {
     const isActive = index === currentIndex;
+
     return (
       <Animated.View
-        style={[styles.offerContainer, isActive && styles.activeSlide]}
+        style={[
+          styles.offerContainer,
+          isActive && { transform: [{ scale: 1.05 }] },
+        ]}
       >
         <Image
           source={{ uri: item.image }}
           style={styles.offerImage}
           resizeMode="cover"
-          onError={e =>
-            console.log('❌ Image failed to load:', item.image, e.nativeEvent)
-          }
         />
       </Animated.View>
     );
@@ -128,7 +134,7 @@ const Offerscreen = () => {
             style={styles.logo}
             resizeMode="contain"
           />
-          <Text style={styles.title}>{t.offersTitle}</Text>
+          <Text style={styles.title}>Yalgud Dairy</Text>
         </View>
 
         {offers.length > 0 ? (
@@ -136,7 +142,7 @@ const Offerscreen = () => {
             <FlatList
               ref={flatListRef}
               data={offers}
-              keyExtractor={(_, index) => index.toString()}
+              keyExtractor={(_, i) => i.toString()}
               renderItem={renderOfferItem}
               horizontal
               pagingEnabled
@@ -161,17 +167,14 @@ const Offerscreen = () => {
             </View>
           </>
         ) : (
-          <Text style={{ color: '#000', fontSize: 16, marginTop: 20 }}>
-            {t.noOffers || 'No offers available'}
-          </Text>
+          <Text style={styles.noOfferText}>No offers available</Text>
         )}
 
         <TouchableOpacity
           style={styles.skipButton}
-          onPress={() => navigation.navigate('home')}
-          activeOpacity={0.8}
+          onPress={() => navigation.navigate('home', { agentCode })}
         >
-          <Text style={styles.skipText}>{t.skip}</Text>
+          <Text style={styles.skipText}>Skip</Text>
         </TouchableOpacity>
       </SafeAreaView>
     </ImageBackground>
@@ -179,75 +182,89 @@ const Offerscreen = () => {
 };
 
 const styles = StyleSheet.create({
-  background: { flex: 1, width: '100%', height: '100%' },
-  container: { flex: 1, alignItems: 'center', paddingTop: SCREEN_HEIGHT * 0.2 },
+  background: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    paddingTop: hp(12),
+  },
+
   header: {
     alignItems: 'center',
-    marginBottom: SCREEN_HEIGHT * 0.04,
-    marginTop: SCREEN_HEIGHT * 0.06,
+    marginBottom: hp(3),
+    marginTop: hp(5),
     width: '90%',
     maxWidth: MAX_CONTENT_WIDTH,
   },
+
   logo: {
-    width: SCREEN_WIDTH * 0.3,
-    maxWidth: 180,
-    height: SCREEN_WIDTH * 0.3,
-    maxHeight: 150,
-    marginTop: -120,
+    width: wp(35),
+    height: wp(35),
+    marginTop: -hp(9),
   },
+
   title: {
-    fontSize: SCREEN_WIDTH * 0.07,
-    maxWidth: MAX_CONTENT_WIDTH,
+    fontSize: scale(wp(7)),
     fontWeight: '700',
     color: '#000',
+    marginTop: hp(4),
     textAlign: 'center',
-    marginTop: 50,
   },
+
   offerContainer: {
     width: SCREEN_WIDTH,
     justifyContent: 'center',
     alignItems: 'center',
-    height: SCREEN_HEIGHT * 0.45,
-    marginBottom: -40,
+    height: hp(45),
   },
-  activeSlide: {
-    transform: [{ scale: 1.02 }],
-  },
+
   offerImage: {
-    width: SCREEN_WIDTH * 0.8,
-    maxWidth: 400,
-    height: SCREEN_HEIGHT * 0.45,
-    maxHeight: 400,
-    borderRadius: 22,
-    borderColor: '#000',
-    marginBottom: 20,
+    width: wp(80),
+    height: hp(45),
+    borderRadius: scale(22),
     backgroundColor: '#f0f0f0',
   },
+
   pagination: {
     flexDirection: 'row',
-    marginVertical: SCREEN_HEIGHT * 0.025,
+    marginVertical: hp(2.5),
     justifyContent: 'center',
     width: '100%',
     maxWidth: MAX_CONTENT_WIDTH,
-    marginBottom: 10,
   },
-  dot: { width: 10, height: 10, borderRadius: 5, marginHorizontal: 5 },
+
+  dot: {
+    width: scale(12),
+    height: scale(12),
+    borderRadius: scale(6),
+    marginHorizontal: scale(5),
+  },
+
   skipButton: {
     borderWidth: 1.5,
     borderColor: '#000',
-    paddingVertical: SCREEN_HEIGHT * 0.015,
-    paddingHorizontal: SCREEN_WIDTH * 0.25,
-    maxWidth: MAX_CONTENT_WIDTH,
-    borderRadius: 10,
-    marginTop: SCREEN_HEIGHT * 0.01,
+    paddingVertical: hp(1.5),
+    paddingHorizontal: wp(25),
+    borderRadius: scale(10),
     backgroundColor: '#2563EB',
-    alignSelf: 'center',
   },
+
   skipText: {
     color: '#fff',
-    fontSize: SCREEN_WIDTH * 0.045,
+    fontSize: scale(wp(4)),
     fontWeight: '600',
     textAlign: 'center',
+  },
+
+  noOfferText: {
+    color: '#000',
+    fontSize: wp(4.5),
+    marginTop: hp(2),
   },
 });
 

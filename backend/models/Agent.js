@@ -1,0 +1,42 @@
+const mongoose = require("mongoose");
+
+const agentSchema = new mongoose.Schema({
+  AgentCode: { type: Number, required: true, unique: true },
+  AgentName: String,
+  AgentNameEng: String,
+  Address1: String,
+  Address2: String,
+  VillageCode: Number,
+  Phone: String,
+  Mobile: String,
+  Email: String,
+  LicNo: String,
+  ExpDate: Date,
+  DepositAmt: Number,
+  DepositDetails: String,
+  SeqNo: Number,
+  SalesRouteCode: Number,
+  SalesRateChartEntryNo: Number,
+  CloseStatus: String,
+  Remark1: String,
+  SchemeStatus: Number,
+  PANo: String,
+  CSTTIN: String,
+  VATTIN: String,
+  STNO: String,
+  ECCNO: String,
+  AgentType: Number,
+  SchemeStatus1: Number,
+  DiscPer: Number,
+  AadharNo: String,
+  BankCode: Number,
+  Bdisc: Number,
+  Ddisc: Number,
+  Sdisc: Number,
+  Hdisc: Number,
+  migratedAt: Date,
+  source: String,
+});
+
+module.exports = mongoose.model("Agent", agentSchema, "AgentMaster");
+
